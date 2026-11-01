@@ -1,0 +1,52 @@
+# ============================================
+#  STM32 + FreeRTOS + Keil MDK 工程 .gitignore
+#  原则：源码和工程配置进仓库，编译产物和个人设置不进
+# ============================================
+
+# ---------- Keil MDK 编译输出 ----------
+# 本工程 OutputDirectory 配置为 Project\，即 MDK-ARM/Project/
+Project/MDK-ARM/Project/
+Project/MDK-ARM/Listings/
+Project/MDK-ARM/DebugConfig/
+
+# Keil 生成的中间文件
+*.o
+*.d
+*.crf
+*.dep
+*.lnp
+*.lst
+*.map
+*.htm
+*.lnk
+*.sct
+*.i
+*.iex
+*.axf
+*.elf
+*.hex
+*.bin
+*.build_log.htm
+*.uvguix.*
+
+# ---------- 个人 / 编辑器设置 ----------
+# 窗口布局、调试器个人配置，换电脑不用同步
+*.uvoptx
+.vscode/
+.idea/
+.settings/
+*.code-workspace
+
+# ---------- 系统与临时文件 ----------
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.bak
+*.tmp
+*~
+*.log
+*.swp
+
+# ---------- 其他工具 ----------
+# STM32CubeMX 的本地缓存
+.mxproject
