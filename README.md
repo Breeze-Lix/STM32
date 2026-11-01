@@ -32,3 +32,27 @@
 
 ## 2. 任务并行
 
+**1.** FreeRTOS中 Tasks and Queues -> Tasks -> Add ->
+       |参数|填写|
+       |Task Name|sinTask|
+       |Priority|osPriorityNormal|
+       |Stack Size|256|
+       |Entry Function|StartSinTask|
+**2.** 在 default 和 sin 分别安排打印 'A'/'B',延时 100/500,测试并发
+       结果：A A A A A B A A A A A B ...
+**3.** 测试正弦任务生成目标值 sin -> 生产者 default -> 消费者
+```
+结果 （有点误差）
+target=0.0
+target=30.9
+target=58.8
+target=80.9
+target=95.1
+target=95.1
+target=80.9
+...
+```
+
+**注：** 两个函数读取，target 要 volatile 
+         生产快、消费慢，模拟真实PID
+
