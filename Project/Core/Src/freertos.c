@@ -26,6 +26,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,9 +46,10 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-
+volatile float g_target;           /* 任务间共享：目标速度 */
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
+osThreadId sinTaskHandle;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -55,6 +57,7 @@ osThreadId defaultTaskHandle;
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void const * argument);
+void StartSinTask(void const * argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -105,6 +108,10 @@ void MX_FREERTOS_Init(void) {
   osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 256);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
+  /* definition and creation of sinTask */
+  osThreadDef(sinTask, StartSinTask, osPriorityNormal, 0, 256);
+  sinTaskHandle = osThreadCreate(osThread(sinTask), NULL);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -124,11 +131,39 @@ void StartDefaultTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-    printf("task alive\r\n");
-    osDelay(500);
+		// 并发测试代码
+    // printf("A ");
+    // osDelay(100);
+		
+		printf("target=%.1f\r\n", g_target);
+    osDelay(100);          /* 100ms 打印一次 → 10Hz */
   }
   /* USER CODE END StartDefaultTask */
+}
+
+/* USER CODE BEGIN Header_StartSinTask */
+/**
+* @brief Function implementing the sinTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartSinTask */
+void StartSinTask(void const * argument)
+{
+  /* USER CODE BEGIN StartSinTask */
+  /* Infinite loop */
+  for(;;)
+  {
+		// 并发测试代码
+		// printf("B ");
+    // osDelay(500);
+		
+	 /* 2 秒一个完整周期，幅度 ±100 */
+   float t = (float)(HAL_GetTick() % 2000u) / 1000.0f;
+   g_target = 100.0f * sinf(2.0f * 3.1415926f * t / 2.0f);
+
+  }
+  /* USER CODE END StartSinTask */
 }
 
 /* Private application code --------------------------------------------------*/
