@@ -27,6 +27,8 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <math.h>
+#include "Motor.h"
+#include "PID.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,9 +49,12 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
 volatile float g_target;           /* 任务间共享：目标速度 */
+PID_t g_pid;
+volatile float g_actual;
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 osThreadId sinTaskHandle;
+osThreadId pidTaskHandle;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -58,6 +63,7 @@ osThreadId sinTaskHandle;
 
 void StartDefaultTask(void const * argument);
 void StartSinTask(void const * argument);
+void StartpidTask(void const * argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -105,12 +111,16 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the thread(s) */
   /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 256);
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityLow, 0, 256);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* definition and creation of sinTask */
   osThreadDef(sinTask, StartSinTask, osPriorityNormal, 0, 256);
   sinTaskHandle = osThreadCreate(osThread(sinTask), NULL);
+
+  /* definition and creation of pidTask */
+  osThreadDef(pidTask, StartpidTask, osPriorityAboveNormal, 0, 256);
+  pidTaskHandle = osThreadCreate(osThread(pidTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -135,8 +145,8 @@ void StartDefaultTask(void const * argument)
     // printf("A ");
     // osDelay(100);
 		
-		printf("target=%.1f\r\n", g_target);
-    osDelay(100);          /* 100ms 打印一次 → 10Hz */
+		printf("%d,%d\r\n", (int)g_target, (int)g_actual);
+    osDelay(100);          /* 100ms 打印一次 -> 10Hz */
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -161,9 +171,34 @@ void StartSinTask(void const * argument)
 	 /* 2 秒一个完整周期，幅度 ±100 */
    float t = (float)(HAL_GetTick() % 2000u) / 1000.0f;
    g_target = 100.0f * sinf(2.0f * 3.1415926f * t / 2.0f);
-
+	 osDelay(10);
   }
   /* USER CODE END StartSinTask */
+}
+
+/* USER CODE BEGIN Header_StartpidTask */
+/**
+* @brief Function implementing the pidTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartpidTask */
+void StartpidTask(void const * argument)
+{
+  /* USER CODE BEGIN StartpidTask */
+	PID_Init(&g_pid, 1.0f, 0.5f, 0.0f, 100.0f, 500.0f);
+  Motor_Init();
+  /* Infinite loop */
+  for(;;)
+  {
+		float actual = Motor_GetSpeed();    // 反馈
+		float out = PID_Calc(&g_pid, g_target, actual, 0.01f);
+		Motor_SetOutput(out);								// 输出
+		g_actual = actual;
+		
+    osDelay(10);
+  }
+  /* USER CODE END StartpidTask */
 }
 
 /* Private application code --------------------------------------------------*/
