@@ -145,8 +145,8 @@ void StartDefaultTask(void const * argument)
     // printf("A ");
     // osDelay(100);
 		
-		printf("%d,%d\r\n", (int)g_target, (int)g_actual);
-    osDelay(100);          /* 100ms 打印一次 -> 10Hz */
+		printf("%f,%f\r\n", g_target, g_actual);
+    osDelay(20);          /* 100ms 打印一次 -> 10Hz */
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -170,7 +170,7 @@ void StartSinTask(void const * argument)
 		
 	 /* 2 秒一个完整周期，幅度 ±100 */
    float t = (float)(HAL_GetTick() % 2000u) / 1000.0f;
-   g_target = 100.0f * sinf(2.0f * 3.1415926f * t / 2.0f);
+   g_target = 100.0f /* * sinf(2.0f * 3.1415926f * t / 2.0f)*/;
 	 osDelay(10);
   }
   /* USER CODE END StartSinTask */
@@ -186,7 +186,7 @@ void StartSinTask(void const * argument)
 void StartpidTask(void const * argument)
 {
   /* USER CODE BEGIN StartpidTask */
-	PID_Init(&g_pid, 1.0f, 0.5f, 0.0f, 100.0f, 500.0f);
+	PID_Init(&g_pid, 3.0f, 0.5f, 0.0f, 100.0f, 500.0f);
   Motor_Init();
   /* Infinite loop */
   for(;;)
