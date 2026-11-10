@@ -214,12 +214,12 @@ void StartSinTask(void const * argument)
 	 // __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
    // osDelay(2000);
 	 
-	 g_target = 100.0f;
+	 // g_target = 100.0f;
 	 
 	 // g_target = ((HAL_GetTick() / 3000u) % 2u) ? 100.0f : 0.0f;
 	 
-	 //float t = (float)(HAL_GetTick() % 2000u) / 1000.0f;
-   //g_target = 50.0f * sinf(2.0f * 3.1415926f * t / 2.0f);
+	 float t = (float)(HAL_GetTick() % 2000u) / 1000.0f;
+   g_target = 100.0f * sinf(2.0f * 3.1415926f * t / 2.0f);
 	 osDelay(10);
   }
   /* USER CODE END StartSinTask */

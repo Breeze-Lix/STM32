@@ -72,7 +72,7 @@ float Motor_GetSpeed(void)
 	float raw = (float)delta / ENCODER_CPR / CTRL_DT * 60.0f;
 	
 	/* 滤波 */
-	s_speed_filt += 0.25 * (raw - s_speed_filt); 
+	s_speed_filt += 0.1 * (raw - s_speed_filt); 
 	
 	/* 转速(rpm) = 圈数 / 时间 × 60 */
 	return s_speed_filt;
