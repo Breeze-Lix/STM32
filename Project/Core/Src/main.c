@@ -19,12 +19,16 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include <stdlib.h>
+#include "PID.h"
+#include "Motor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -34,7 +38,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define CMD_LEN 24
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -45,14 +49,21 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+static char s_cmd[CMD_LEN];
+static uint8_t s_index;
+static uint8_t s_in;
 
+static uint8_t s_rx_byte;
+
+extern PID_t g_pid;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
-
+void CMD_Feed(uint8_t ch);
+void CMD_Parse(char *s);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -62,6 +73,69 @@ int fputc(int ch, FILE *f)
     uint8_t c = (uint8_t)ch;
     HAL_UART_Transmit(&huart2, &c, 1u, 10u);
     return ch;
+}
+
+void CMD_Feed(uint8_t ch)
+{
+	if(ch == '[')
+	{
+		s_index = 0;
+		s_in    = 1;
+		return;
+	}
+	
+	if(s_in == 0)return;
+	
+	if(ch == ']')
+	{
+		s_cmd[s_index] = '\0';
+		CMD_Parse(s_cmd);
+		s_in = 0;
+		return;
+	}
+	
+	if(s_index < CMD_LEN - 1)
+	{
+		s_cmd[s_index++] = (char)ch;
+		
+	}else{
+		s_in = 0;
+	}
+}
+
+void CMD_Parse(char *s)
+{
+	
+	char *end;
+  float v;
+	
+	if(s[0] == 'k' && s[1] == 'p' && s[2] == '='){
+		v = strtof(&s[3], &end);
+		if (end != &s[3]) { g_pid.kp = v; } 
+	}
+	
+	else if(s[0] == 'k' && s[1] == 'i' && s[2] == '='){
+		v = strtof(&s[3], &end);
+		if (end != &s[3]) { g_pid.ki = v; }
+	}
+	
+	else if(s[0] == 'k' && s[1] == 'd' && s[2] == '='){
+		v = strtof(&s[3], &end);
+		if (end != &s[3]) { g_pid.kd = v; }
+	}
+	
+	else if(s[0] == 'z')
+		PID_Reset(&g_pid);
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if(huart->Instance == USART2)
+	{
+		CMD_Feed(s_rx_byte);
+		
+		HAL_UART_Receive_IT(&huart2, &s_rx_byte, 1);  
+	}
 }
 /* USER CODE END 0 */
 
@@ -95,8 +169,11 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_TIM4_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-
+	Motor_Init();
+	HAL_UART_Receive_IT(&huart2, &s_rx_byte, 1);  
   /* USER CODE END 2 */
 
   /* Call init function for freertos objects (in cmsis_os2.c) */

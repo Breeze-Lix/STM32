@@ -27,6 +27,9 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <math.h>
+
+#include "tim.h"
+
 #include "Motor.h"
 #include "PID.h"
 /* USER CODE END Includes */
@@ -48,9 +51,12 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
+
+
 volatile float g_target;           /* 任务间共享：目标速度 */
 PID_t g_pid;
 volatile float g_actual;
+
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 osThreadId sinTaskHandle;
@@ -111,7 +117,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the thread(s) */
   /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityLow, 0, 256);
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityLow, 0, 512);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* definition and creation of sinTask */
@@ -138,6 +144,11 @@ void MX_FREERTOS_Init(void) {
 void StartDefaultTask(void const * argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
+	// Motor_Init();
+	// Motor_SetOutput(30.0f);
+	
+	// uint32_t last_print = 0;
+  // float v = 0.0f;
   /* Infinite loop */
   for(;;)
   {
@@ -145,8 +156,21 @@ void StartDefaultTask(void const * argument)
     // printf("A ");
     // osDelay(100);
 		
+		// 打印模拟PID
 		printf("%f,%f\r\n", g_target, g_actual);
-    osDelay(20);          /* 100ms 打印一次 -> 10Hz */
+    // osDelay(20);          /* 100ms 打印 */
+		
+		// v = Motor_GetSpeed();                    /* 必须�? 10ms �? */
+    // Motor_SetOutput(30.0f);                  /* 保持输出不变 */
+
+    // if (HAL_GetTick() - last_print >= 100u)
+    // {
+    //   last_print = HAL_GetTick();
+    //   printf("%d\r\n", (int)v);
+    // }
+		// printf("%f\r\n",(float)g_pid.kp);
+		
+    osDelay(50);
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -162,15 +186,40 @@ void StartSinTask(void const * argument)
 {
   /* USER CODE BEGIN StartSinTask */
   /* Infinite loop */
+	
+	// HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+	// HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET); 
   for(;;)
   {
 		// 并发测试代码
 		// printf("B ");
     // osDelay(500);
 		
-	 /* 2 秒一个完整周期，幅度 ±100 */
-   float t = (float)(HAL_GetTick() % 2000u) / 1000.0f;
-   g_target = 100.0f /* * sinf(2.0f * 3.1415926f * t / 2.0f)*/;
+	 // /* 2 秒一个完整周期，幅度 ±100 */
+   // float t = (float)(HAL_GetTick() % 2000u) / 1000.0f;
+   // g_target = 100.0f /* * sinf(2.0f * 3.1415926f * t / 2.0f)*/;
+		
+	 // HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+	 // HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
+	 // __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 1080);
+   // osDelay(2000);
+	 // 
+	 // HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
+	 // HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
+	 // __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 1080);
+   // osDelay(2000);
+	 // 
+	 // HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
+	 // HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
+	 // __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+   // osDelay(2000);
+	 
+	 g_target = 100.0f;
+	 
+	 // g_target = ((HAL_GetTick() / 3000u) % 2u) ? 100.0f : 0.0f;
+	 
+	 //float t = (float)(HAL_GetTick() % 2000u) / 1000.0f;
+   //g_target = 50.0f * sinf(2.0f * 3.1415926f * t / 2.0f);
 	 osDelay(10);
   }
   /* USER CODE END StartSinTask */
@@ -186,8 +235,8 @@ void StartSinTask(void const * argument)
 void StartpidTask(void const * argument)
 {
   /* USER CODE BEGIN StartpidTask */
-	PID_Init(&g_pid, 3.0f, 0.5f, 0.0f, 100.0f, 500.0f);
-  Motor_Init();
+	PID_Init(&g_pid, 1.0f, 0.5f, 0.0f, 100.0f, 500.0f);
+	TickType_t xLastWake = xTaskGetTickCount();
   /* Infinite loop */
   for(;;)
   {
@@ -196,13 +245,14 @@ void StartpidTask(void const * argument)
 		Motor_SetOutput(out);								// 输出
 		g_actual = actual;
 		
-    osDelay(10);
+    vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(10));
   }
   /* USER CODE END StartpidTask */
 }
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+
 
 /* USER CODE END Application */
 
