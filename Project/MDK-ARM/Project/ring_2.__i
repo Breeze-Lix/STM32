@@ -1,0 +1,6 @@
+--c99 -c --cpu Cortex-M3 -g -O3 --apcs=interwork --split_sections -I ../Core/Inc -I ../Drivers/STM32F1xx_HAL_Driver/Inc -I ../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32F1xx/Include -I ../Drivers/CMSIS/Include
+-I.\RTE\_Project
+-ID:\tool\Keil5_MDK\ARM\PACK\ARM\CMSIS\5.0.1\CMSIS\Include
+-ID:\tool\Keil5_MDK\ARM\PACK\Keil\STM32F1xx_DFP\2.4.0\Device\Include
+-D__UVISION_VERSION="524" -D_RTE_ -DSTM32F10X_MD -DUSE_HAL_DRIVER -DSTM32F103xB
+-o project\ring_2.o --omf_browse project\ring_2.crf --depend project\ring_2.d "..\Core\Src\Ring_2.c"
