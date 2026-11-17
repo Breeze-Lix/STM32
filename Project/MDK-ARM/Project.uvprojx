@@ -18,7 +18,7 @@
           <Vendor>STMicroelectronics</Vendor>
           <PackID>Keil.STM32F1xx_DFP.2.4.0</PackID>
           <PackURL>http://www.keil.com/pack/</PackURL>
-          <Cpu>IRAM(0x20000000-0x20004FFF) IROM(0x8000000-0x800FFFF) CLOCK(8000000) CPUTYPE("Cortex-M3") TZ</Cpu>
+          <Cpu>IRAM(0x20000000-0x20004FFF) IROM(0x8000000-0x800FFFF)  CLOCK(8000000) CPUTYPE("Cortex-M3") TZ</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
           <StartupFile></StartupFile>
           <FlashDriverDll></FlashDriverDll>
@@ -401,11 +401,6 @@
               <FilePath>../Core/Src/gpio.c</FilePath>
             </File>
             <File>
-              <FileName>dma.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>../Core/Src/dma.c</FilePath>
-            </File>
-            <File>
               <FileName>usart.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/usart.c</FilePath>
@@ -506,48 +501,6 @@
               <FilePath>../Core/Src/system_stm32f1xx.c</FilePath>
             </File>
           </Files>
-        </Group>
-        <Group>
-          <GroupName>APP/Inc</GroupName>
-          <Files>
-            <File>
-              <FileName>Ring.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Core\Inc\Ring.h</FilePath>
-            </File>
-            <File>
-              <FileName>UARTRx.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Core\Inc\UARTRx.h</FilePath>
-            </File>
-          
-      <File>
-        <FileName>zdt42.h</FileName>
-        <FileType>5</FileType>
-        <FilePath>..\Core\Inc\zdt42.h</FilePath>
-      </File>
-    </Files>
-        </Group>
-        <Group>
-          <GroupName>APP/Src</GroupName>
-          <Files>
-            <File>
-              <FileName>Ring.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Core\Src\Ring.c</FilePath>
-            </File>
-            <File>
-              <FileName>UARTRx.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Core\Src\UARTRx.c</FilePath>
-            </File>
-          
-      <File>
-        <FileName>zdt42.c</FileName>
-        <FileType>1</FileType>
-        <FilePath>..\Core\Src\zdt42.c</FilePath>
-      </File>
-    </Files>
         </Group>
         <Group>
           <GroupName>::CMSIS</GroupName>
