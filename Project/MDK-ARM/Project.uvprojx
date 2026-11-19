@@ -503,6 +503,26 @@
           </Files>
         </Group>
         <Group>
+          <GroupName>APP/Inc</GroupName>
+          <Files>
+            <File>
+              <FileName>zdt42.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\Inc\zdt42.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>APP/Src</GroupName>
+          <Files>
+            <File>
+              <FileName>zdt42.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\zdt42.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
           <GroupName>::CMSIS</GroupName>
         </Group>
       </Groups>

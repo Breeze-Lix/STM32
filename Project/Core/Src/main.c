@@ -23,7 +23,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "zdt42.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -33,7 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define ZDT42_MOTOR_ID  0x05U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -44,11 +44,8 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint8_t tx_frame[3] = {0x05, 0x1F, 0x6B};
-uint8_t rx_frame[5] = {0};
-
-HAL_StatusTypeDef tx_result = HAL_OK;
-HAL_StatusTypeDef rx_result = HAL_OK;
+ZDT42_Status zdt_status = ZDT42_OK;
+uint8_t zdt_version[5] = {0};
 volatile uint8_t test_done = 0;
 /* USER CODE END PV */
 
@@ -94,13 +91,14 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-	HAL_Delay(1000);
-
-	tx_result = HAL_UART_Transmit(
-			&huart1, tx_frame, sizeof(tx_frame), 100);
+	zdt_status = ZDT42_Init(&huart1);
 	
-	rx_result = HAL_UART_Receive(
-			&huart1, rx_frame, sizeof(rx_frame), 500);
+	if (zdt_status == ZDT42_OK)
+	{
+			HAL_Delay(1000);
+			zdt_status = ZDT42_ReadVersion(
+					ZDT42_MOTOR_ID, zdt_version, sizeof(zdt_version));
+	}
 	
 	test_done = 1;
   /* USER CODE END 2 */

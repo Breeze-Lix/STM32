@@ -1,7 +1,7 @@
 # ZDT_X42S 步进电机驱动（STM32F103 + HAL + CubeMX）
 
 > 创建日期：2026-11-17  
-> 当前进度：第 3 步已完成，准备进入第 4 步——驱动文件与接口骨架
+> 当前进度：第 4、5 步代码已完成并通过编译，等待可用电机进行硬件复核
 
 ## 1. 工程目标
 
@@ -9,7 +9,7 @@
 
 当前实际使用的驱动板丝印型号为 **X42_V1.3**，属于老板卡。工程名称虽为 `ZDT_X42S`，但协议和返回格式应以实际电机的响应为准，不能完全照搬新版 X42S 手册。
 
-本 README 记录到已完成的第 3 步。正式的 `zdt42.c`、`zdt42.h` 驱动文件将在第 4 步建立。
+本 README 记录到第 5 步。第 4、5 步已经完成代码编写和 Keil 全量编译；由于当前电机损坏，驱动版读取版本、使能、停止和失能的实际硬件效果仍待复核。
 
 ## 2. 开发环境
 
@@ -27,6 +27,8 @@
 | 第 1 步 | 硬件、接线与 TTL 通信验证 | 已完成 |
 | 第 2 步 | 理解通信协议和已验证命令 | 已完成 |
 | 第 3 步 | CubeMX 配置及 STM32 串口收发验证 | 已完成 |
+| 第 4 步 | 驱动骨架与读取版本接口 | 代码完成，待硬件复核 |
+| 第 5 步 | 使能、失能与立即停止接口 | 代码完成，待硬件验证 |
 
 ## 4. 已确认的电机参数
 
@@ -216,10 +218,156 @@ rx_frame  = 05 1F 02 82 6B
 
 这表明 STM32 已通过 USART1 独立完成命令发送和电机回复接收，双向 TTL 通信正常，第 3 步完成。Watch 中 `0x82 '?'`、`0x6B 'k'` 只是同时显示字节对应的 ASCII 字符，不是通信错误。
 
-## 8. 工程维护注意事项
+## 8. 第 4 步：驱动文件与接口骨架
+
+### 8.1 驱动文件
+
+```text
+Project/
+└─ Core/
+   ├─ Inc/
+   │  └─ zdt42.h
+   └─ Src/
+      ├─ main.c
+      └─ zdt42.c
+```
+
+`zdt42.c` 已加入 Keil 工程的 `APP/Src` 分组，`zdt42.h` 已加入 `APP/Inc` 分组。`Core/Inc` 已在 C/C++ Include Path 中。
+
+### 8.2 分层职责
+
+```text
+main.c 应用层
+    ↓ 调用驱动接口
+zdt42.c / zdt42.h 驱动层
+    ↓ 调用 HAL UART
+USART1 / PA9 / PA10
+    ↓ TTL
+ZDT42 电机
+```
+
+- `main.c` 不再直接拼接十六进制协议帧；
+- `zdt42.c` 负责组帧、UART 收发、回复检查和错误转换；
+- `ZDT42_Send()`、`ZDT42_Receive()` 使用 `static`，仅供驱动内部调用；
+- UART 句柄通过 `ZDT42_Init(&huart1)` 传入，驱动内部不直接依赖全局 `huart1`。
+
+### 8.3 当前公开接口
+
+```c
+ZDT42_Status ZDT42_Init(UART_HandleTypeDef *huart);
+ZDT42_Status ZDT42_ReadVersion(uint8_t id, uint8_t *rx, uint16_t rx_size);
+```
+
+`ZDT42_Status` 是自定义枚举返回值，用于告诉调用者函数是否成功以及失败原因。
+
+| 枚举值 | 数值 | 含义 |
+|---|---:|---|
+| `ZDT42_OK` | 0 | 执行成功 |
+| `ZDT42_PARAM_ERROR` | 1 | 本地参数错误 |
+| `ZDT42_HAL_ERROR` | 2 | HAL 收发失败 |
+| `ZDT42_TIMEOUT` | 3 | 收发超时 |
+| `ZDT42_RESPONSE_ERROR` | 4 | 回复地址、功能码或帧尾不符合要求 |
+| `ZDT42_MOTOR_ERROR` | 5 | 电机返回 `E2`，参数或运行条件不满足 |
+| `ZDT42_FORMAT_ERROR` | 6 | 电机返回 `EE`，命令格式错误 |
+
+函数返回值表示执行状态，`rx` 指向的数组用于保存电机返回的数据，两者职责不同。
+
+### 8.4 当前 main.c 调用方式
+
+```c
+zdt_status = ZDT42_Init(&huart1);
+
+if (zdt_status == ZDT42_OK)
+{
+    HAL_Delay(1000);
+    zdt_status = ZDT42_ReadVersion(
+        0x05, zdt_version, sizeof(zdt_version));
+}
+
+test_done = 1;
+```
+
+`ZDT42_ReadVersion()` 当前固定接收 5 字节，这是根据 X42_V1.3 老板卡实测回复 `05 1F 02 82 6B` 编写的，不能视为所有 ZDT42 固件的通用返回长度。
+
+## 9. 第 5 步：使能、失能与立即停止
+
+### 9.1 新增接口
+
+```c
+ZDT42_Status ZDT42_Enable(uint8_t id, uint8_t enable);
+ZDT42_Status ZDT42_Stop(uint8_t id);
+```
+
+调用示例：
+
+```c
+zdt_status = ZDT42_Enable(0x05, 1);  /* 使能 */
+zdt_status = ZDT42_Stop(0x05);       /* 立即停止 */
+zdt_status = ZDT42_Enable(0x05, 0);  /* 失能 */
+```
+
+`ZDT42_Enable()` 只允许 `enable` 为 `0` 或 `1`，其他值返回 `ZDT42_PARAM_ERROR`。当前接口针对单电机控制，`id = 0` 不作为这些接口的有效参数。
+
+### 9.2 驱动生成的命令
+
+| 接口 | 生成的命令 |
+|---|---|
+| `ZDT42_Enable(0x05, 1)` | `05 F3 AB 01 00 6B` |
+| `ZDT42_Enable(0x05, 0)` | `05 F3 AB 00 00 6B` |
+| `ZDT42_Stop(0x05)` | `05 FE 98 00 6B` |
+
+同步标志当前固定为 `00`，表示立即执行。
+
+### 9.3 控制命令回复检查
+
+驱动内部新增静态函数 `ZDT42_ControlCommand()`，统一完成：
+
+1. 发送控制命令；
+2. 接收 4 字节回复；
+3. 检查回复地址和 `0x6B` 帧尾；
+4. 识别电机返回的 `02`、`E2`、`EE`；
+5. 检查成功回复中的功能码是否与原命令一致。
+
+| 回复情况 | 驱动返回 |
+|---|---|
+| `02` 且地址、功能码、帧尾正确 | `ZDT42_OK` |
+| 电机返回 `E2` | `ZDT42_MOTOR_ERROR` |
+| 电机返回 `EE` | `ZDT42_FORMAT_ERROR` |
+| 地址、功能码或帧尾异常 | `ZDT42_RESPONSE_ERROR` |
+| 规定时间内未收到完整回复 | `ZDT42_TIMEOUT` |
+
+## 10. 编译与硬件验证状态
+
+2026-11-18 已使用 Keil ARMCC V5.06 对第 4、5 步代码进行全量重新编译：
+
+```text
+compiling main.c...
+compiling zdt42.c...
+linking...
+0 Error(s), 0 Warning(s).
+```
+
+已生成：
+
+```text
+Project/MDK-ARM/Project/Project.axf
+Project/MDK-ARM/Project/Project.hex
+```
+
+当前仅证明代码可以通过编译和链接。由于电机暂时损坏，以下项目仍等待硬件验证：
+
+- 通过 `ZDT42_ReadVersion()` 接收版本回复；
+- `ZDT42_Enable(0x05, 1)` 后电机是否锁轴；
+- `ZDT42_Stop(0x05)` 是否正确停止；
+- `ZDT42_Enable(0x05, 0)` 后电机是否松轴；
+- 超时和错误状态是否与预期一致。
+
+在硬件复核完成前，不将这些接口标记为“实机验证通过”。
+
+## 11. 工程维护注意事项
 
 - 在 CubeMX 重新生成代码时，自行添加的内容应放在 `USER CODE` 区域，避免被覆盖；
-- 当前阻塞收发代码仅用于验证硬件和串口配置，不作为正式驱动结构；
+- 当前驱动使用阻塞式 HAL UART 收发，后续再进行接收方式和超时机制优化；
 - 在确认接收超时或数据异常时，不要连续发送运动命令；
 - 电机运动测试应保持空载、固定电机，并确保可以及时断电；
 - 不要带电插拔电机线、供电线或通信线。
