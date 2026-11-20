@@ -6,6 +6,7 @@
 #define ZDT42_RX_TIMEOUT_MS      500U					/* 数据接收时限 */
 #define ZDT42_VERSION_REPLY_LEN  5U						/* 电机回复长度 */
 #define ZDT42_MAX_SPEED_RPM      3000					/* Emm 速度模式最大转速 */
+#define ZDT42_PULSES_PER_REV     3200ULL				/* 默认 1.8° 电机、16 细分 */
 
 static UART_HandleTypeDef *zdt42_uart = NULL;     /* 步进电机绑定串口 */
 
@@ -168,6 +169,74 @@ ZDT42_Status ZDT42_SetSpeed(uint8_t id, int16_t rpm, uint8_t accel)
     tx[7] = ZDT42_CHECK_BYTE;
 
     return ZDT42_ControlCommand(tx, sizeof(tx), id, 0xF6U);
+}
+
+/* =============== 位置模式内部组帧函数 =============== */
+static ZDT42_Status ZDT42_MovePosition(uint8_t id,
+                                       int32_t angle_deg,
+                                       uint16_t rpm,
+                                       uint8_t accel,
+                                       uint8_t mode)
+{
+    uint8_t tx[13];
+    uint64_t angle_magnitude;
+    uint64_t pulses;
+    uint32_t pulse_count;
+    uint8_t direction;
+
+    if ((rpm == 0U) || (rpm > ZDT42_MAX_SPEED_RPM))
+    {
+        return ZDT42_PARAM_ERROR;
+    }
+
+    if (angle_deg < 0)
+    {
+        direction = 0x01U;
+        angle_magnitude = (uint64_t)(-(int64_t)angle_deg);
+    }
+    else
+    {
+        direction = 0x00U;
+        angle_magnitude = (uint64_t)angle_deg;
+    }
+
+    /* 四舍五入到最接近的脉冲数。 */
+    pulses = (angle_magnitude * ZDT42_PULSES_PER_REV + 180ULL) / 360ULL;
+    if (pulses > 0xFFFFFFFFULL)
+    {
+        return ZDT42_PARAM_ERROR;
+    }
+    pulse_count = (uint32_t)pulses;
+
+    tx[0] = id;
+    tx[1] = 0xFDU;
+    tx[2] = direction;
+    tx[3] = (uint8_t)(rpm >> 8);
+    tx[4] = (uint8_t)(rpm & 0xFFU);
+    tx[5] = accel;
+    tx[6] = (uint8_t)(pulse_count >> 24);
+    tx[7] = (uint8_t)(pulse_count >> 16);
+    tx[8] = (uint8_t)(pulse_count >> 8);
+    tx[9] = (uint8_t)(pulse_count & 0xFFU);
+    tx[10] = mode;
+    tx[11] = 0x00U;
+    tx[12] = ZDT42_CHECK_BYTE;
+
+    return ZDT42_ControlCommand(tx, sizeof(tx), id, 0xFDU);
+}
+
+/* =============== 相对位置：Emm42 V5.0 使用模式 00 =============== */
+ZDT42_Status ZDT42_MoveRelative(uint8_t id, int32_t angle_deg,
+                                uint16_t rpm, uint8_t accel)
+{
+    return ZDT42_MovePosition(id, angle_deg, rpm, accel, 0x00U);
+}
+
+/* =============== 绝对位置：相对坐标零点运动，使用模式 01 =============== */
+ZDT42_Status ZDT42_MoveAbsolute(uint8_t id, int32_t angle_deg,
+                                uint16_t rpm, uint8_t accel)
+{
+    return ZDT42_MovePosition(id, angle_deg, rpm, accel, 0x01U);
 }
 
 /* =============== 发送读取版本命令并检查回复 =============== */
