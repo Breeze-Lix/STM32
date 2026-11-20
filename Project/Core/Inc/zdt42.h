@@ -19,5 +19,6 @@ ZDT42_Status ZDT42_Init(UART_HandleTypeDef *huart);
 ZDT42_Status ZDT42_ReadVersion(uint8_t id, uint8_t *rx, uint16_t rx_size);
 ZDT42_Status ZDT42_Enable(uint8_t id, uint8_t enable);
 ZDT42_Status ZDT42_Stop(uint8_t id);
+ZDT42_Status ZDT42_SetSpeed(uint8_t id, int16_t rpm, uint8_t accel);
 
 #endif

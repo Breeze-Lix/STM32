@@ -5,6 +5,7 @@
 #define ZDT42_TX_TIMEOUT_MS      100U					/* 数据接送时限 */
 #define ZDT42_RX_TIMEOUT_MS      500U					/* 数据接收时限 */
 #define ZDT42_VERSION_REPLY_LEN  5U						/* 电机回复长度 */
+#define ZDT42_MAX_SPEED_RPM      3000					/* Emm 速度模式最大转速 */
 
 static UART_HandleTypeDef *zdt42_uart = NULL;     /* 步进电机绑定串口 */
 
@@ -131,6 +132,42 @@ ZDT42_Status ZDT42_Stop(uint8_t id)
     uint8_t tx[5] = {id, 0xFEU, 0x98U, 0x00U, ZDT42_CHECK_BYTE};
 
     return ZDT42_ControlCommand(tx, sizeof(tx), id, 0xFEU);
+}
+
+/* =============== 速度模式：正数正转，负数反转 =============== */
+ZDT42_Status ZDT42_SetSpeed(uint8_t id, int16_t rpm, uint8_t accel)
+{
+    uint8_t tx[8];
+    uint16_t speed;
+    uint8_t direction;
+
+    if ((rpm == 0) || (rpm > ZDT42_MAX_SPEED_RPM) ||
+        (rpm < -ZDT42_MAX_SPEED_RPM))
+    {
+        return ZDT42_PARAM_ERROR;
+    }
+
+    if (rpm < 0)
+    {
+        direction = 0x01U;
+        speed = (uint16_t)(-(int32_t)rpm);
+    }
+    else
+    {
+        direction = 0x00U;
+        speed = (uint16_t)rpm;
+    }
+
+    tx[0] = id;
+    tx[1] = 0xF6U;
+    tx[2] = direction;
+    tx[3] = (uint8_t)(speed >> 8);
+    tx[4] = (uint8_t)(speed & 0xFFU);
+    tx[5] = accel;
+    tx[6] = 0x00U;
+    tx[7] = ZDT42_CHECK_BYTE;
+
+    return ZDT42_ControlCommand(tx, sizeof(tx), id, 0xF6U);
 }
 
 /* =============== 发送读取版本命令并检查回复 =============== */
