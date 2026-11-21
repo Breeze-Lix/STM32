@@ -33,7 +33,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define ZDT42_MOTOR_ID  0x05U
+#define ZDT42_MOTOR_ID      0x05U
+#define ZDT42_TEST_STAGE    0U
+#define ZDT42_TEST_WAIT_MS  3000U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -46,13 +48,22 @@
 /* USER CODE BEGIN PV */
 ZDT42_Status zdt_status = ZDT42_OK;
 uint8_t zdt_version[5] = {0};
+int16_t zdt_speed = 0;
+float zdt_angle = 0.0f;
+int32_t zdt_target_angle = 0;
 volatile uint8_t test_done = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
+static void ZDT42_AbortMotion(uint8_t id);
+static ZDT42_Status ZDT42_TestReadOnly(uint8_t id);
+static ZDT42_Status ZDT42_TestBasicControl(uint8_t id);
+static ZDT42_Status ZDT42_TestSpeed(uint8_t id);
+static ZDT42_Status ZDT42_TestRelativePosition(uint8_t id);
+static ZDT42_Status ZDT42_TestAbsolutePosition(uint8_t id);
+static ZDT42_Status ZDT42_TestRun(uint8_t id, uint8_t stage);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -91,16 +102,15 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-	zdt_status = ZDT42_Init(&huart1);
-	
-	if (zdt_status == ZDT42_OK)
-	{
-			HAL_Delay(1000);
-			zdt_status = ZDT42_ReadVersion(
-					ZDT42_MOTOR_ID, zdt_version, sizeof(zdt_version));
-	}
-	
-	test_done = 1;
+  zdt_status = ZDT42_Init(&huart1);
+
+  if (zdt_status == ZDT42_OK)
+  {
+      HAL_Delay(1000);
+      zdt_status = ZDT42_TestRun(ZDT42_MOTOR_ID, ZDT42_TEST_STAGE);
+  }
+
+  test_done = 1;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -151,7 +161,292 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+static void ZDT42_AbortMotion(uint8_t id)
+{
+    (void)ZDT42_Stop(id);
+    (void)ZDT42_Enable(id, 0);
+}
 
+static ZDT42_Status ZDT42_TestReadOnly(uint8_t id)
+{
+    ZDT42_Status status;
+
+    status = ZDT42_ReadVersion(id, zdt_version, sizeof(zdt_version));
+    if (status != ZDT42_OK)
+    {
+        return status;
+    }
+
+    status = ZDT42_ReadSpeed(id, &zdt_speed);
+    if (status != ZDT42_OK)
+    {
+        return status;
+    }
+
+    return ZDT42_ReadPosition(id, &zdt_angle);
+}
+
+static ZDT42_Status ZDT42_TestBasicControl(uint8_t id)
+{
+    ZDT42_Status status;
+
+    status = ZDT42_Enable(id, 1);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    HAL_Delay(500U);
+
+    status = ZDT42_Stop(id);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    HAL_Delay(200U);
+
+    status = ZDT42_Enable(id, 0);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+    }
+
+    return status;
+}
+
+static ZDT42_Status ZDT42_TestSpeed(uint8_t id)
+{
+    ZDT42_Status status;
+
+    status = ZDT42_Enable(id, 1);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    status = ZDT42_SetSpeed(id, 10, 10);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    HAL_Delay(ZDT42_TEST_WAIT_MS);
+
+    status = ZDT42_ReadSpeed(id, &zdt_speed);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    status = ZDT42_Stop(id);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    HAL_Delay(500U);
+
+    status = ZDT42_SetSpeed(id, -10, 10);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    HAL_Delay(ZDT42_TEST_WAIT_MS);
+
+    status = ZDT42_ReadSpeed(id, &zdt_speed);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    status = ZDT42_Stop(id);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    HAL_Delay(500U);
+
+    status = ZDT42_Enable(id, 0);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+    }
+
+    return status;
+}
+
+static ZDT42_Status ZDT42_TestRelativePosition(uint8_t id)
+{
+    ZDT42_Status status;
+
+    status = ZDT42_Enable(id, 1);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    status = ZDT42_MoveRelative(id, 90, 10, 10);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    HAL_Delay(ZDT42_TEST_WAIT_MS);
+
+    status = ZDT42_ReadPosition(id, &zdt_angle);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    status = ZDT42_MoveRelative(id, -90, 10, 10);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    HAL_Delay(ZDT42_TEST_WAIT_MS);
+
+    status = ZDT42_ReadPosition(id, &zdt_angle);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    status = ZDT42_Stop(id);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    status = ZDT42_Enable(id, 0);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+    }
+
+    return status;
+}
+
+static ZDT42_Status ZDT42_TestAbsolutePosition(uint8_t id)
+{
+    ZDT42_Status status;
+    int32_t start_angle;
+
+    status = ZDT42_Enable(id, 1);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    status = ZDT42_ReadPosition(id, &zdt_angle);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+    start_angle = (int32_t)zdt_angle;
+
+    zdt_target_angle = start_angle + 90;
+    status = ZDT42_MoveAbsolute(id, zdt_target_angle, 10, 10);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    HAL_Delay(ZDT42_TEST_WAIT_MS);
+
+    status = ZDT42_ReadPosition(id, &zdt_angle);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    status = ZDT42_MoveAbsolute(id, start_angle, 10, 10);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    HAL_Delay(ZDT42_TEST_WAIT_MS);
+
+    status = ZDT42_ReadPosition(id, &zdt_angle);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    status = ZDT42_Stop(id);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+        return status;
+    }
+
+    status = ZDT42_Enable(id, 0);
+    if (status != ZDT42_OK)
+    {
+        ZDT42_AbortMotion(id);
+    }
+
+    return status;
+}
+
+static ZDT42_Status ZDT42_TestRun(uint8_t id, uint8_t stage)
+{
+    ZDT42_Status status;
+
+    if (stage > 4U)
+    {
+        return ZDT42_PARAM_ERROR;
+    }
+
+    /* 无论哪个阶段，都先验证只读通信。 */
+    status = ZDT42_TestReadOnly(id);
+    if (status != ZDT42_OK)
+    {
+        return status;
+    }
+
+    switch (stage)
+    {
+        case 0U:
+            return ZDT42_OK;
+        case 1U:
+            return ZDT42_TestBasicControl(id);
+        case 2U:
+            return ZDT42_TestSpeed(id);
+        case 3U:
+            return ZDT42_TestRelativePosition(id);
+        case 4U:
+            return ZDT42_TestAbsolutePosition(id);
+        default:
+            return ZDT42_PARAM_ERROR;
+    }
+}
 /* USER CODE END 4 */
 
 /**
