@@ -60,6 +60,57 @@ static ZDT42_Status ZDT42_Receive(uint8_t *data, uint16_t length)
         HAL_UART_Receive(zdt42_uart, data, length, ZDT42_RX_TIMEOUT_MS));
 }
 
+/* =============== 读取类命令：发送查询并检查回复 =============== */
+static ZDT42_Status ZDT42_Query(uint8_t id,
+                                uint8_t function_code,
+                                uint8_t *rx,
+                                uint16_t reply_length)
+{
+    uint8_t tx[3] = {id, function_code, ZDT42_CHECK_BYTE};
+    ZDT42_Status status;
+
+    if ((id == 0U) || (rx == NULL) || (reply_length < 5U))
+    {
+        return ZDT42_PARAM_ERROR;
+    }
+
+    status = ZDT42_Send(tx, sizeof(tx));
+    if (status != ZDT42_OK)
+    {
+        return status;
+    }
+
+    /* 先接收 4 字节，可及时识别 E2/EE 短错误帧。 */
+    status = ZDT42_Receive(rx, 4U);
+    if (status != ZDT42_OK)
+    {
+        return status;
+    }
+
+    if ((rx[2] == 0xEEU) && (rx[3] == ZDT42_CHECK_BYTE))
+    {
+        return ZDT42_FORMAT_ERROR;
+    }
+    if ((rx[2] == 0xE2U) && (rx[3] == ZDT42_CHECK_BYTE))
+    {
+        return ZDT42_MOTOR_ERROR;
+    }
+
+    status = ZDT42_Receive(rx + 4U, reply_length - 4U);
+    if (status != ZDT42_OK)
+    {
+        return status;
+    }
+
+    if ((rx[0] != id) || (rx[1] != function_code) ||
+        (rx[reply_length - 1U] != ZDT42_CHECK_BYTE))
+    {
+        return ZDT42_RESPONSE_ERROR;
+    }
+
+    return ZDT42_OK;
+}
+
 /* =============== 发送控制命令并检查 4 字节回复 =============== */
 static ZDT42_Status ZDT42_ControlCommand(const uint8_t *tx,
                                          uint16_t tx_length,
@@ -242,30 +293,87 @@ ZDT42_Status ZDT42_MoveAbsolute(uint8_t id, int32_t angle_deg,
 /* =============== 发送读取版本命令并检查回复 =============== */
 ZDT42_Status ZDT42_ReadVersion(uint8_t id, uint8_t *rx, uint16_t rx_size)
 {
-    uint8_t tx[3] = {id, 0x1FU, ZDT42_CHECK_BYTE};
-    ZDT42_Status status;
-
-    if ((id == 0U) || (rx == NULL) || (rx_size < ZDT42_VERSION_REPLY_LEN))
+    if ((rx == NULL) || (rx_size < ZDT42_VERSION_REPLY_LEN))
     {
         return ZDT42_PARAM_ERROR;
     }
 
-    status = ZDT42_Send(tx, sizeof(tx));
+    return ZDT42_Query(id, 0x1FU, rx, ZDT42_VERSION_REPLY_LEN);
+}
+
+/* =============== 读取实时转速，单位 RPM =============== */
+ZDT42_Status ZDT42_ReadSpeed(uint8_t id, int16_t *rpm)
+{
+    uint8_t rx[6] = {0};
+    uint16_t speed;
+    ZDT42_Status status;
+
+    if (rpm == NULL)
+    {
+        return ZDT42_PARAM_ERROR;
+    }
+
+    status = ZDT42_Query(id, 0x35U, rx, sizeof(rx));
     if (status != ZDT42_OK)
     {
         return status;
     }
 
-    status = ZDT42_Receive(rx, ZDT42_VERSION_REPLY_LEN);
-    if (status != ZDT42_OK)
-    {
-        return status;
-    }
-
-    if ((rx[0] != id) || (rx[1] != 0x1FU) ||
-        (rx[ZDT42_VERSION_REPLY_LEN - 1U] != ZDT42_CHECK_BYTE))
+    if (rx[2] > 0x01U)
     {
         return ZDT42_RESPONSE_ERROR;
+    }
+
+    speed = ((uint16_t)rx[3] << 8) | (uint16_t)rx[4];
+    if (rx[2] == 0x01U)
+    {
+        *rpm = -(int16_t)speed;
+    }
+    else
+    {
+        *rpm = (int16_t)speed;
+    }
+
+    return ZDT42_OK;
+}
+
+/* =============== 读取实时位置，转换为带符号角度 =============== */
+ZDT42_Status ZDT42_ReadPosition(uint8_t id, float *angle_deg)
+{
+    uint8_t rx[8] = {0};
+    uint32_t raw_position;
+    float magnitude;
+    ZDT42_Status status;
+
+    if (angle_deg == NULL)
+    {
+        return ZDT42_PARAM_ERROR;
+    }
+
+    status = ZDT42_Query(id, 0x36U, rx, sizeof(rx));
+    if (status != ZDT42_OK)
+    {
+        return status;
+    }
+
+    if (rx[2] > 0x01U)
+    {
+        return ZDT42_RESPONSE_ERROR;
+    }
+
+    raw_position = ((uint32_t)rx[3] << 24) |
+                   ((uint32_t)rx[4] << 16) |
+                   ((uint32_t)rx[5] << 8) |
+                   (uint32_t)rx[6];
+
+    magnitude = (float)raw_position * 360.0f / 65536.0f;
+    if (rx[2] == 0x01U)
+    {
+        *angle_deg = -magnitude;
+    }
+    else
+    {
+        *angle_deg = magnitude;
     }
 
     return ZDT42_OK;

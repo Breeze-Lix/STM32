@@ -81,4 +81,21 @@ ZDT42_Status ZDT42_MoveRelative(uint8_t id, int32_t angle_deg,
 ZDT42_Status ZDT42_MoveAbsolute(uint8_t id, int32_t angle_deg,
                                 uint16_t rpm, uint8_t accel);
 
+/**
+ * @brief  读取 Emm 固件的实时转速。
+ * @param  id：电机地址，例如 0x05。
+ * @param  rpm：输出参数，成功时保存带符号转速，单位为 RPM。
+ * @return 返回 ZDT42_Status；失败时不修改输出值。
+ */
+ZDT42_Status ZDT42_ReadSpeed(uint8_t id, int16_t *rpm);
+
+/**
+ * @brief  读取 Emm 固件的实时位置并转换为角度。
+ * @param  id：电机地址，例如 0x05。
+ * @param  angle_deg：输出参数，成功时保存带符号位置角度，单位为度。
+ * @return 返回 ZDT42_Status；失败时不修改输出值。
+ * @note   Emm 原始位置每 65536 个计数对应一圈 360°。
+ */
+ZDT42_Status ZDT42_ReadPosition(uint8_t id, float *angle_deg);
+
 #endif
